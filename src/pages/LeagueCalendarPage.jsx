@@ -1,0 +1,132 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getCompetitionMatches } from '../api/footballApi';
+import { translateStatus, formatScore, formatDate, formatTime } from '../utils/matchUtils';
+
+export default function LeagueCalendarPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  const [matches, setMatches] = useState([]);
+  const [competitionName, setCompetitionName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  useEffect(() => {
+    loadMatches();
+  }, [id, dateFrom, dateTo]);
+
+  const loadMatches = async () => {
+    try {
+      setLoading(true);
+      const data = await getCompetitionMatches(id, dateFrom || null, dateTo || null);
+      
+      setMatches(data.matches || []);
+      setCompetitionName(data.competition?.name || `Лига ${id}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="text-center py-20 text-3xl">⏳ Загрузка матчей...</div>;
+  if (error) {
+  return (
+    <div className="text-center py-20">
+      <div className="text-amber-600 text-2xl mb-4">⏳ {error}</div>
+      <button 
+        onClick={() => window.location.reload()} 
+        className="px-8 py-3 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700"
+      >
+        Обновить
+      </button>
+    </div>
+  );
+}
+  return (
+    <div className="max-w-7xl mx-auto">
+      {/* Хлебные крошки */}
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+        <span onClick={() => navigate('/leagues')} className="cursor-pointer hover:text-emerald-600">Лиги</span>
+        <span>›</span>
+        <span className="font-medium text-gray-900">{competitionName}</span>
+      </div>
+
+      <h1 className="text-4xl font-bold mb-8">{competitionName}</h1>
+
+      {/* Фильтры дат */}
+      <div className="bg-white p-6 rounded-3xl shadow mb-8 flex gap-6 items-end">
+        <div>
+          <label className="block text-sm text-gray-500 mb-1">Матчи с</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm text-gray-500 mb-1">по</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500"
+          />
+        </div>
+        <button
+          onClick={() => { setDateFrom(''); setDateTo(''); }}
+          className="px-6 py-3 text-gray-600 hover:bg-gray-100 rounded-2xl"
+        >
+          Сбросить
+        </button>
+      </div>
+
+      {/* Таблица матчей */}
+      <div className="bg-white rounded-3xl shadow overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-4 text-left">Дата</th>
+              <th className="px-6 py-4 text-left">Время</th>
+              <th className="px-6 py-4 text-left">Статус</th>
+              <th className="px-6 py-4 text-left">Матч</th>
+              <th className="px-6 py-4 text-right">Счёт</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matches.map((match) => (
+              <tr key={match.id} className="border-b last:border-none hover:bg-gray-50">
+                <td className="px-6 py-5 font-medium">{formatDate(match.utcDate)}</td>
+                <td className="px-6 py-5">{formatTime(match.utcDate)}</td>
+                <td className="px-6 py-5">
+                  <span className="inline-block px-4 py-1 text-xs font-medium rounded-2xl bg-emerald-100 text-emerald-700">
+                    {translateStatus(match.status)}
+                  </span>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{match.homeTeam.name}</span>
+                    <span className="text-gray-400">—</span>
+                    <span className="font-medium">{match.awayTeam.name}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-5 text-right font-bold">
+                  {formatScore(match.score) || '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {matches.length === 0 && (
+        <div className="text-center py-16 text-gray-500">В выбранный период матчей нет</div>
+      )}
+    </div>
+  );
+}
